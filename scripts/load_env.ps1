@@ -52,6 +52,15 @@ $env:DBT_PROFILES_DIR = $repoRoot
 # cài ngôn ngữ tiếng Việt (codepage cp1258).
 $env:PYTHONUTF8 = '1'
 
+# VS Code chụp biến môi trường lúc khởi động, nên terminal mở trong VS Code
+# có thể chưa thấy gcloud dù PATH hệ thống đã được cập nhật. Thêm vào PATH
+# của session này để không phải khởi động lại VS Code.
+$gcloudBin = Join-Path $env:LOCALAPPDATA 'GoogleCloudSDK\google-cloud-sdk\bin'
+if ((Test-Path $gcloudBin) -and ($env:Path -notlike "*$gcloudBin*")) {
+    $env:Path = "$env:Path;$gcloudBin"
+    Write-Host "[OK] Da them gcloud vao PATH cua session nay" -ForegroundColor Green
+}
+
 Write-Host "[OK] Da nap $loaded bien tu .env" -ForegroundColor Green
 Write-Host "     GCP_PROJECT_ID  = $env:GCP_PROJECT_ID"
 Write-Host "     BQ_RAW_DATASET  = $env:BQ_RAW_DATASET"
