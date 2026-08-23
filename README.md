@@ -244,6 +244,12 @@ Tạo 4 file trong `data/raw/`: 500 khách hàng, 60 sản phẩm, 4.000 đơn
 hàng và khoảng 12.000 dòng hàng. Dữ liệu cố ý có "rác" (email viết hoa,
 khoảng trắng thừa, ô rỗng, đơn bị huỷ) để tầng staging có việc làm thật.
 
+Khoảng thời gian là **24 tháng gần nhất tính tới hôm nay**, không phải
+ngày cố định. Lý do: `dim_customers` phân khúc churn bằng
+`date_diff(current_date(), last_order_date)` — nếu cắm mốc thời gian
+cứng thì chỉ sau vài tháng toàn bộ khách sẽ rơi vào `churned` và cột
+`customer_segment` mất hết ý nghĩa.
+
 > Muốn dùng dữ liệu thật của bạn: bỏ file CSV vào `data/raw/` và sửa
 > khai báo schema trong `scripts/load_to_bigquery.py` cho khớp.
 

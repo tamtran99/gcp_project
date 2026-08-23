@@ -23,8 +23,13 @@ N_CUSTOMERS = 500
 N_PRODUCTS = 60
 N_ORDERS = 4_000
 
-START_DATE = date(2023, 1, 1)
-END_DATE = date(2024, 12, 31)
+# Dữ liệu trải 24 tháng gần nhất TÍNH TỚI HÔM NAY, không phải ngày cố định.
+# Lý do: dim_customers tính phân khúc churn bằng
+# date_diff(current_date(), last_order_date). Nếu cố định mốc thời gian,
+# chỉ sau vài tháng là toàn bộ khách hàng đều rơi vào 'churned' và cột
+# customer_segment mất hết ý nghĩa.
+END_DATE = date.today()
+START_DATE = END_DATE - timedelta(days=730)
 
 RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
 
