@@ -1,9 +1,25 @@
+{{
+    config(
+        materialized = 'table',
+        partition_by = {
+            'field': 'order_date',
+            'data_type': 'date',
+            'granularity': 'day'
+        },
+        cluster_by = ['product_id']
+    )
+}}
+
 -- Ghép dòng hàng với header đơn và thông tin sản phẩm.
 --
--- Model này materialize là "ephemeral" (khai báo ở dbt_project.yml):
--- dbt sẽ chèn thẳng SQL này vào model cha dưới dạng CTE thay vì tạo
--- bảng/view riêng. Hợp lý vì nó chỉ là bước trung gian, được nhiều mart
--- dùng lại nhưng bản thân không ai query trực tiếp.
+-- Mặc định tầng intermediate trong dbt_project.yml là 'ephemeral' — dbt
+-- chèn SQL thẳng vào model cha dưới dạng CTE, không tạo đối tượng nào
+-- trên warehouse. Hợp lý khi model trung gian chỉ có 1-2 nơi dùng.
+--
+-- Nhưng model này được 4 mart dùng lại (dim_customers, dim_products,
+-- fct_orders, fct_order_items). Để ephemeral thì BigQuery phải chạy lại
+-- cả join 3 bảng 4 lần, tức trả tiền quét dữ liệu 4 lần. Nên ở đây ghi
+-- đè thành 'table': tính một lần, bốn mart cùng đọc.
 
 with order_items as (
 

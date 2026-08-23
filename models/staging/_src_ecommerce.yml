@@ -11,11 +11,14 @@ sources:
     database: "{{ env_var('GCP_PROJECT_ID') }}"
     schema: "{{ env_var('BQ_RAW_DATASET', 'raw_ecommerce') }}"
 
-    # Cảnh báo nếu dữ liệu thô quá cũ (dbt source freshness)
-    freshness:
-      warn_after: {count: 7, period: day}
-      error_after: {count: 30, period: day}
-    loaded_at_field: null
+    config:
+      # Cảnh báo nếu dữ liệu thô quá cũ. loaded_at_field để trống nghĩa là
+      # dbt dùng metadata của bảng BigQuery thay vì một cột timestamp.
+      # Kiểm tra bằng: dbt source freshness
+      freshness:
+        warn_after: {count: 7, period: day}
+        error_after: {count: 30, period: day}
+      loaded_at_field: null
 
     tables:
       - name: customers
@@ -48,8 +51,9 @@ sources:
             data_tests:
               - not_null
               - relationships:
-                  to: source('ecommerce', 'customers')
-                  field: customer_id
+                  arguments:
+                    to: source('ecommerce', 'customers')
+                    field: customer_id
           - name: order_status
             description: pending | shipped | completed | cancelled | returned
 
@@ -62,7 +66,8 @@ sources:
             data_tests:
               - not_null
               - relationships:
-                  to: source('ecommerce', 'orders')
-                  field: order_id
+                  arguments:
+                    to: source('ecommerce', 'orders')
+                    field: order_id
           - name: product_id
             data_tests: [not_null]

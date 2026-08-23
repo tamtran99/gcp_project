@@ -1,6 +1,7 @@
 # dbt + BigQuery
-dbt-core>=1.9,<1.11
-dbt-bigquery>=1.9,<1.11
+# Ghim theo minor: dbt-core 1.10 trở về trước đã ngừng nhận bản vá.
+dbt-core>=1.12,<1.13
+dbt-bigquery>=1.12,<1.13
 
 # Client dùng cho script load dữ liệu lên BigQuery
 google-cloud-bigquery>=3.25,<4

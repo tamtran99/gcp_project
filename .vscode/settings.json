@@ -1,4 +1,11 @@
 {
+  // ---------- Terminal ----------
+  // PYTHONUTF8 bắt buộc trên Windows tiếng Việt, nếu không dbt sẽ lỗi
+  // UnicodeDecodeError khi đọc file .yml/.sql có dấu.
+  "terminal.integrated.env.windows": {
+    "PYTHONUTF8": "1"
+  },
+
   // ---------- Python ----------
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
   "python.terminal.activateEnvironment": true,

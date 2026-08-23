@@ -14,7 +14,8 @@ models:
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: total_orders
         data_tests: [not_null]
       - name: customer_segment
@@ -22,7 +23,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['never_purchased', 'churned', 'one_time', 'repeat', 'loyal']
+              arguments:
+                values: ['never_purchased', 'churned', 'one_time', 'repeat', 'loyal']
 
   - name: dim_products
     description: >
@@ -35,7 +37,8 @@ models:
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: revenue_rank_in_category
         description: Hạng 1 là sản phẩm doanh thu cao nhất ngành hàng đó.
         data_tests: [not_null]
@@ -51,8 +54,9 @@ models:
         data_tests:
           - not_null
           - relationships:
-              to: ref('dim_customers')
-              field: customer_id
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
       - name: order_date
         data_tests: [not_null]
       - name: revenue
@@ -60,7 +64,8 @@ models:
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: line_item_count
         data_tests: [not_null]
 
@@ -75,14 +80,16 @@ models:
         data_tests:
           - not_null
           - relationships:
-              to: ref('fct_orders')
-              field: order_id
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
       - name: product_id
         data_tests:
           - not_null
           - relationships:
-              to: ref('dim_products')
-              field: product_id
+              arguments:
+                to: ref('dim_products')
+                field: product_id
       - name: quantity
         data_tests: [not_null]
       - name: revenue
@@ -100,11 +107,13 @@ models:
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: cancellation_rate_pct
         data_tests:
           - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 100
+              arguments:
+                min_value: 0
+                max_value: 100
       - name: total_orders
         data_tests: [not_null]

@@ -47,6 +47,11 @@ foreach ($line in Get-Content $envFile -Encoding UTF8) {
 # -> quy về đường dẫn tuyệt đối của repo.
 $env:DBT_PROFILES_DIR = $repoRoot
 
+# Ép Python đọc/ghi file bằng UTF-8. Không có dòng này, dbt sẽ lỗi
+# UnicodeDecodeError khi gặp tiếng Việt trong .yml/.sql trên máy Windows
+# cài ngôn ngữ tiếng Việt (codepage cp1258).
+$env:PYTHONUTF8 = '1'
+
 Write-Host "[OK] Da nap $loaded bien tu .env" -ForegroundColor Green
 Write-Host "     GCP_PROJECT_ID  = $env:GCP_PROJECT_ID"
 Write-Host "     BQ_RAW_DATASET  = $env:BQ_RAW_DATASET"

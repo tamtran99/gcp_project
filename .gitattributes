@@ -1,0 +1,11 @@
+# Chuẩn hoá line ending: lưu LF trong repo, checkout theo OS.
+* text=auto eol=lf
+
+# Script PowerShell nên giữ CRLF trên Windows
+*.ps1 text eol=crlf
+
+# File nhị phân — không đụng vào
+*.png binary
+*.jpg binary
+*.parquet binary
+*.avro binary

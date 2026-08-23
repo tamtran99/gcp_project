@@ -84,7 +84,28 @@ Cài bằng winget nếu chưa có:
 ```powershell
 winget install --id Python.Python.3.11 --architecture x64 --source winget
 winget install --id Git.Git --source winget
-winget install --id Google.CloudSDK --source winget
+```
+
+> `--source winget` là bắt buộc: nếu thiếu, winget cố tìm cả nguồn
+> `msstore` và có thể lỗi `0x8a15005e` (sai chứng chỉ server).
+
+**Google Cloud CLI** nên cài từ bản zip có sẵn Python thay vì winget —
+installer của winget hay thất bại trên máy ARM và bản đó không kèm
+Python:
+
+```powershell
+$url = 'https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-windows-x86_64-bundled-python.zip'
+Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\gcloud.zip" -UseBasicParsing
+Expand-Archive "$env:TEMP\gcloud.zip" -DestinationPath "$env:LOCALAPPDATA\GoogleCloudSDK" -Force
+& "$env:LOCALAPPDATA\GoogleCloudSDK\google-cloud-sdk\install.bat" --quiet --path-update true
+```
+
+Nếu installer báo không tự cập nhật được PATH, thêm tay:
+
+```powershell
+$bin = "$env:LOCALAPPDATA\GoogleCloudSDK\google-cloud-sdk\bin"
+[Environment]::SetEnvironmentVariable('Path',
+    [Environment]::GetEnvironmentVariable('Path','User') + ";$bin", 'User')
 ```
 
 Sau khi cài xong phải **mở lại terminal** thì PATH mới cập nhật.
@@ -144,9 +165,9 @@ Mỗi khi mở terminal mới, nạp biến vào session:
 dbt --version
 ```
 
-Kết quả cần thấy `Core: 1.9.x` và `bigquery: 1.9.x`.
+Kết quả cần thấy `Core: 1.12.x` và `bigquery: 1.12.x`.
 
-Cài các package dbt phụ thuộc (`dbt_utils`, `dbt_expectations`):
+Cài các package dbt phụ thuộc (`dbt_utils`, `metaplane/dbt_expectations`):
 
 ```powershell
 dbt deps
@@ -286,9 +307,14 @@ nullif(trim(city), '')      as city     -- ô rỗng phải là NULL, không ph�
 ```
 
 **`models/intermediate/`** — bước trung gian phức tạp, ở đây là join
-order_items × orders × products và tính lợi nhuận gộp. Materialize
-`ephemeral`: dbt chèn thẳng SQL này thành CTE trong model cha, không tạo
-đối tượng nào trên BigQuery.
+order_items × orders × products và tính lợi nhuận gộp.
+
+Mặc định tầng này là `ephemeral` (dbt chèn SQL thành CTE trong model cha,
+không tạo đối tượng nào trên BigQuery). Nhưng
+`int_order_items_enriched` được **4 mart** dùng lại, để `ephemeral` thì
+BigQuery phải chạy lại join 3 bảng 4 lần — trả tiền quét dữ liệu 4 lần.
+Vì vậy model đó ghi đè thành `table`: tính một lần, bốn mart cùng đọc.
+Đây là đánh đổi cần cân nhắc mỗi khi thêm model intermediate.
 
 **`models/marts/`** — bảng cuối cho BI, materialize `table`:
 
@@ -384,6 +410,8 @@ dbt test --select stg_ecommerce__orders     # test của 1 model
 | `No matching signature for operator * (NUMERIC, FLOAT64)` | Đang chia cho `100.0`. Xem mục 5.3 về NUMERIC |
 | `dbt: command not found` | Chưa activate venv: `.\.venv\Scripts\Activate.ps1` |
 | Profile not found | Đặt `DBT_PROFILES_DIR` về thư mục repo (đã có trong `load_env.ps1`) |
+| `UnicodeDecodeError: 'charmap' codec can't decode byte...` | Windows tiếng Việt dùng codepage cp1258 để đọc file. Đặt `PYTHONUTF8=1` (đã có sẵn trong `.env` và `load_env.ps1`) |
+| `Arguments to generic tests should be nested under 'arguments'` | Cú pháp test cũ. Từ dbt 1.12 phải viết `- relationships:` rồi `arguments:` rồi mới tới `to:`/`field:` |
 
 ---
 

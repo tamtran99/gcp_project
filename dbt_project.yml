@@ -34,14 +34,14 @@ models:
       +schema: staging
 
     intermediate:
-      # Bảng trung gian dùng lại nhiều lần -> ephemeral để gộp vào SQL cha
+      # Mặc định ephemeral: gộp thẳng vào SQL của model cha, không tạo
+      # đối tượng trên warehouse. Model nào được nhiều mart dùng lại thì
+      # tự ghi đè thành table trong file .sql của nó.
       +materialized: ephemeral
+      +schema: intermediate
 
     marts:
       # Marts là nơi BI query -> materialize thành table cho nhanh
       +materialized: table
       +schema: marts
 
-seeds:
-  ecommerce_analytics:
-    +schema: seeds
