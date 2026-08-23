@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "shell": {
+      "executable": "powershell.exe",
+      "args": ["-NoProfile", "-Command"]
+    }
+  },
+  "tasks": [
+    {
+      "label": "1. Sinh dữ liệu mẫu (CSV)",
+      "type": "shell",
+      "command": ". ./scripts/load_env.ps1; ./.venv/Scripts/python.exe scripts/generate_sample_data.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "2. Tạo dataset trên BigQuery",
+      "type": "shell",
+      "command": ". ./scripts/load_env.ps1; ./.venv/Scripts/python.exe scripts/setup_bigquery.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "3. Load CSV -> BigQuery",
+      "type": "shell",
+      "command": ". ./scripts/load_env.ps1; ./.venv/Scripts/python.exe scripts/load_to_bigquery.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "dbt: debug (kiểm tra kết nối)",
+      "type": "shell",
+      "command": ". ./scripts/load_env.ps1; ./.venv/Scripts/dbt.exe debug",
+      "problemMatcher": []
+    },
+    {
+      "label": "dbt: build (run + test)",
+      "type": "shell",
+      "command": ". ./scripts/load_env.ps1; ./.venv/Scripts/dbt.exe build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "dbt: docs serve",
+      "type": "shell",
+      "command": ". ./scripts/load_env.ps1; ./.venv/Scripts/dbt.exe docs generate; ./.venv/Scripts/dbt.exe docs serve",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

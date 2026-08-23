@@ -1,0 +1,11 @@
+# dbt + BigQuery
+dbt-core>=1.9,<1.11
+dbt-bigquery>=1.9,<1.11
+
+# Client dùng cho script load dữ liệu lên BigQuery
+google-cloud-bigquery>=3.25,<4
+python-dotenv>=1.0
+
+# Tiện ích chất lượng code (tuỳ chọn nhưng nên có)
+sqlfluff>=3.2
+sqlfluff-templater-dbt>=3.2

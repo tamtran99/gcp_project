@@ -1,0 +1,68 @@
+version: 2
+
+sources:
+  - name: ecommerce
+    description: >
+      Dữ liệu thô nạp từ file CSV lên BigQuery bằng
+      scripts/load_to_bigquery.py. Tầng này KHÔNG được sửa đổi —
+      mọi làm sạch diễn ra ở staging.
+
+    # Lấy từ biến môi trường để dev/prod dùng chung một khai báo
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: "{{ env_var('BQ_RAW_DATASET', 'raw_ecommerce') }}"
+
+    # Cảnh báo nếu dữ liệu thô quá cũ (dbt source freshness)
+    freshness:
+      warn_after: {count: 7, period: day}
+      error_after: {count: 30, period: day}
+    loaded_at_field: null
+
+    tables:
+      - name: customers
+        description: Một dòng cho mỗi khách hàng đã đăng ký tài khoản.
+        columns:
+          - name: customer_id
+            description: Khoá chính, dạng C00001.
+            data_tests: [unique, not_null]
+          - name: email
+            description: Email thô — có thể viết hoa hoặc dư khoảng trắng.
+          - name: signup_date
+            description: Ngày tạo tài khoản.
+
+      - name: products
+        description: Danh mục sản phẩm đang và đã từng bán.
+        columns:
+          - name: product_id
+            data_tests: [unique, not_null]
+          - name: unit_price
+            description: Giá niêm yết (NUMERIC để tránh sai số float).
+          - name: cost_price
+            description: Giá vốn, dùng để tính lợi nhuận gộp.
+
+      - name: orders
+        description: Header đơn hàng. Partition theo order_date.
+        columns:
+          - name: order_id
+            data_tests: [unique, not_null]
+          - name: customer_id
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('ecommerce', 'customers')
+                  field: customer_id
+          - name: order_status
+            description: pending | shipped | completed | cancelled | returned
+
+      - name: order_items
+        description: Chi tiết dòng hàng. Một đơn có 1-5 dòng.
+        columns:
+          - name: order_item_id
+            data_tests: [unique, not_null]
+          - name: order_id
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('ecommerce', 'orders')
+                  field: order_id
+          - name: product_id
+            data_tests: [not_null]

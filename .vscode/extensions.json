@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "innoverio.vscode-dbt-power-user",
+    "samuelcolvin.jinjahtml",
+    "redhat.vscode-yaml",
+    "googlecloudtools.cloudcode",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-bigquery"
+  ]
+}

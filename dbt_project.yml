@@ -1,0 +1,47 @@
+name: 'ecommerce_analytics'
+version: '1.0.0'
+config-version: 2
+
+# Trỏ tới profile trong profiles.yml (cùng thư mục repo)
+profile: 'ecommerce_analytics'
+
+model-paths: ['models']
+analysis-paths: ['analyses']
+test-paths: ['tests']
+seed-paths: ['seeds']
+macro-paths: ['macros']
+snapshot-paths: ['snapshots']
+
+clean-targets:
+  - 'target'
+  - 'dbt_packages'
+
+# Biến dùng chung cho toàn bộ project
+vars:
+  # Chỉ lấy đơn hàng từ ngày này trở đi (dùng trong staging)
+  start_date: '2023-01-01'
+  # Số ngày không mua hàng thì coi là khách "churn"
+  churn_threshold_days: 180
+
+models:
+  ecommerce_analytics:
+    # Mặc định: view (rẻ, luôn tươi). Từng tầng ghi đè bên dưới.
+    +materialized: view
+
+    staging:
+      # Staging chỉ đổi tên/ép kiểu -> view là đủ, không tốn storage
+      +materialized: view
+      +schema: staging
+
+    intermediate:
+      # Bảng trung gian dùng lại nhiều lần -> ephemeral để gộp vào SQL cha
+      +materialized: ephemeral
+
+    marts:
+      # Marts là nơi BI query -> materialize thành table cho nhanh
+      +materialized: table
+      +schema: marts
+
+seeds:
+  ecommerce_analytics:
+    +schema: seeds

@@ -1,0 +1,36 @@
+[sqlfluff]
+dialect = bigquery
+templater = dbt
+max_line_length = 88
+
+# Bỏ qua các rule hay gây nhiễu trong dự án dbt
+exclude_rules = ST06, RF01, AM04
+
+[sqlfluff:templater:dbt]
+project_dir = ./
+profiles_dir = ./
+profile = ecommerce_analytics
+target = dev
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indented_joins = false
+indented_ctes = false
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:aliasing.table]
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.column]
+aliasing = explicit

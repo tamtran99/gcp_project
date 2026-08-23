@@ -1,0 +1,46 @@
+# =====================================================================
+# profiles.yml — cấu hình kết nối dbt -> BigQuery
+#
+# File này KHÔNG chứa secret: mọi giá trị đọc từ biến môi trường (.env).
+# Vì vậy có thể commit an toàn lên git.
+#
+# dbt tìm file này qua biến DBT_PROFILES_DIR (đã set trong .env và
+# .vscode/settings.json thành "." = thư mục repo).
+# =====================================================================
+
+ecommerce_analytics:
+  target: dev
+
+  outputs:
+    # ---------------- DEV: chạy local bằng tài khoản cá nhân ----------
+    dev:
+      type: bigquery
+      # oauth = dùng Application Default Credentials từ
+      #   gcloud auth application-default login
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_DBT_DATASET', 'dbt_dev') }}"
+      location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+
+      # Huỷ query nếu chạy quá 5 phút -> tránh đốt tiền do query lỗi
+      job_execution_timeout_seconds: 300
+      job_retries: 1
+      priority: interactive
+
+      # Chặn query quét quá 20 GB. Bỏ comment khi muốn siết chi phí.
+      # maximum_bytes_billed: 21474836480
+
+    # ---------------- PROD: dùng cho CI/CD (service account) ----------
+    # Kích hoạt bằng: dbt run --target prod
+    prod:
+      type: bigquery
+      method: service-account
+      keyfile: "{{ env_var('GCP_SA_KEYFILE', '') }}"
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_PROD_DATASET', 'analytics') }}"
+      location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
+      threads: 8
+      job_execution_timeout_seconds: 600
+      job_retries: 2
+      priority: interactive

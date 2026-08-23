@@ -1,0 +1,37 @@
+{
+  // ---------- Python ----------
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.envFile": "${workspaceFolder}/.env",
+
+  // ---------- dbt (extension dbt Power User) ----------
+  "dbt.dbtPythonPathOverride": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "dbt.enableNewLineagePanel": true,
+  "dbt.profilesDirOverride": "${workspaceFolder}",
+
+  // ---------- Nhận diện file .sql của dbt là Jinja-SQL ----------
+  "files.associations": {
+    "*.sql": "jinja-sql",
+    "profiles.yml": "yaml",
+    "dbt_project.yml": "yaml"
+  },
+  "[jinja-sql]": {
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+  },
+  "[yaml]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.autoIndent": "keep"
+  },
+
+  // ---------- Chung ----------
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "search.exclude": {
+    "**/target": true,
+    "**/dbt_packages": true,
+    "**/logs": true,
+    "**/.venv": true
+  }
+}

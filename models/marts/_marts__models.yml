@@ -1,0 +1,110 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: >
+      Bảng chiều khách hàng kèm chỉ số vòng đời (LTV, số đơn, phân khúc).
+      Hạt: một dòng một khách hàng.
+    columns:
+      - name: customer_id
+        description: Khoá chính.
+        data_tests: [unique, not_null]
+      - name: lifetime_value
+        description: Tổng doanh thu thực thu từ khách này (đơn hợp lệ).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: total_orders
+        data_tests: [not_null]
+      - name: customer_segment
+        description: never_purchased | churned | one_time | repeat | loyal
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['never_purchased', 'churned', 'one_time', 'repeat', 'loyal']
+
+  - name: dim_products
+    description: >
+      Bảng chiều sản phẩm kèm hiệu quả bán hàng và xếp hạng theo ngành.
+      Hạt: một dòng một sản phẩm.
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: total_revenue
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: revenue_rank_in_category
+        description: Hạng 1 là sản phẩm doanh thu cao nhất ngành hàng đó.
+        data_tests: [not_null]
+
+  - name: fct_orders
+    description: >
+      Fact ở mức đơn hàng. Incremental + partition theo order_date.
+      Hạt: một dòng một đơn hàng.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_id
+      - name: order_date
+        data_tests: [not_null]
+      - name: revenue
+        description: net_amount nếu đơn hợp lệ, ngược lại bằng 0.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: line_item_count
+        data_tests: [not_null]
+
+  - name: fct_order_items
+    description: >
+      Fact ở mức dòng hàng — bảng chi tiết nhất của mô hình.
+      Hạt: một dòng một order_item.
+    columns:
+      - name: order_item_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('fct_orders')
+              field: order_id
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_products')
+              field: product_id
+      - name: quantity
+        data_tests: [not_null]
+      - name: revenue
+        data_tests: [not_null]
+
+  - name: agg_daily_revenue
+    description: >
+      Doanh thu tổng hợp theo ngày, phục vụ dashboard điều hành.
+      Hạt: một dòng một ngày có phát sinh đơn.
+    columns:
+      - name: order_date
+        description: Khoá chính — mỗi ngày đúng một dòng.
+        data_tests: [unique, not_null]
+      - name: revenue
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: cancellation_rate_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: total_orders
+        data_tests: [not_null]

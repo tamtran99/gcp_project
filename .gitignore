@@ -1,0 +1,30 @@
+# ---- Secrets & môi trường ----
+.env
+.env.*
+!.env.example
+*-key.json
+*credentials*.json
+service-account*.json
+
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- dbt ----
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# ---- Dữ liệu sinh ra cục bộ ----
+data/raw/*.csv
+!data/raw/.gitkeep
+
+# ---- OS / IDE ----
+.DS_Store
+Thumbs.db
+.vscode/*.local.json

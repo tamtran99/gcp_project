@@ -1,0 +1,8 @@
+packages:
+  # Bộ macro tiện ích chuẩn của dbt (date_spine, surrogate_key, pivot...)
+  - package: dbt-labs/dbt_utils
+    version: [">=1.3.0", "<2.0.0"]
+
+  # Bộ test nâng cao: expect_column_values_to_be_between, row_count...
+  - package: calogica/dbt_expectations
+    version: [">=0.10.0", "<0.11.0"]
