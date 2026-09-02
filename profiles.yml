@@ -44,3 +44,26 @@ ecommerce_analytics:
       job_execution_timeout_seconds: 600
       job_retries: 2
       priority: interactive
+
+    # ---------------- CI: build tu Pull Request, dataset co lap -------
+    # Dung boi DAG git_pr_builds trong Airflow: dbt build --target ci
+    #
+    # Cung service account key voi prod, chi khac TEN TARGET va dataset.
+    # Chinh cai ten do la thu bao ve production: macro generate_schema_name
+    # chi tra ve ten schema tho khi target.name == 'prod'. Voi target 'ci' no
+    # roi vao nhanh else va them tien to dataset, nen PR #42 (BQ_CI_DATASET
+    # = pr_42) ghi vao pr_42_staging / pr_42_intermediate / pr_42_marts.
+    #
+    # Neu build PR bang --target prod thi moi PR se de thang len bang
+    # production, 15 phut mot lan.
+    ci:
+      type: bigquery
+      method: service-account
+      keyfile: "{{ env_var('GCP_SA_KEYFILE', '') }}"
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_CI_DATASET', 'ci_pr') }}"
+      location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
+      threads: 8
+      job_execution_timeout_seconds: 600
+      job_retries: 2
+      priority: interactive

@@ -1,0 +1,24 @@
+# =====================================================================
+# Dependency của Airflow — CỐ Ý tách khỏi requirements.txt
+#
+# KHÔNG cài file này vào venv của dbt và ngược lại. dbt-core 1.12 ghim
+# jinja2/click/protobuf ở các khoảng xung đột trực tiếp với constraint set của
+# airflow-core; trộn chung thì một trong hai sẽ hỏng theo kiểu rất khó lần.
+#
+# Đó cũng là lý do task dbt trong DAG là BashOperator gọi ra subprocess chứ
+# không phải PythonOperator import dbt.
+#
+# Cách cài (constraint file là bắt buộc, đừng bỏ):
+#
+#   python3.11 -m venv ~/venvs/airflow
+#   ~/venvs/airflow/bin/pip install "apache-airflow==3.3.1" \
+#     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.1/constraints-3.11.txt"
+#
+# scripts/airflow_bootstrap.sh đã làm sẵn việc này.
+# =====================================================================
+
+apache-airflow==3.3.1
+
+# BashOperator nằm trong provider standard, vốn đã là dependency cứng của
+# airflow-core nên không cần cài thêm. Ghi ra đây cho tường minh.
+apache-airflow-providers-standard>=1.9.0

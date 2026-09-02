@@ -24,7 +24,19 @@ logs/
 data/raw/*.csv
 !data/raw/.gitkeep
 
+# ---- Airflow ----
+# AIRFLOW_HOME nằm ngoài repo (~/airflow trong WSL), nhưng chặn sẵn phòng khi
+# ai đó lỡ trỏ vào đây. airflow.db chứa cả connection lẫn variable.
+airflow_home/
+airflow.cfg
+airflow.db
+*.db
+simple_auth_manager_passwords.json.generated
+
 # ---- OS / IDE ----
 .DS_Store
 Thumbs.db
 .vscode/*.local.json
+
+# ---- Claude Code ----
+.claude/settings.local.json

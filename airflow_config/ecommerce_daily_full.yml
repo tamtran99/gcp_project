@@ -1,0 +1,49 @@
+# =====================================================================
+# Pipeline đầy đủ, chạy 02:00 giờ Việt Nam mỗi ngày.
+#
+#   sinh CSV -> tạo dataset -> load lên raw_ecommerce -> dbt build toàn bộ
+#
+# Đây là DAG duy nhất có pre_tasks. Các DAG khác chỉ transform lại dữ liệu
+# mà DAG này đã nạp.
+# =====================================================================
+
+ecommerce_daily_full:
+  is_disabled: false
+  config:
+    select:
+      - path:models/staging
+      - path:models/intermediate
+      - path:models/marts
+
+    # Bước nạp dữ liệu, chạy tuần tự TRƯỚC dbt. Đường dẫn tương đối gốc repo.
+    pre_tasks:
+      - name: generate_sample_data
+        script: scripts/generate_sample_data.py
+      - name: setup_bigquery
+        script: scripts/setup_bigquery.py
+      - name: load_to_bigquery
+        script: scripts/load_to_bigquery.py
+
+    dbt:
+      target: prod
+      command: build
+
+    dag_params:
+      tags:
+        - ecommerce
+        - dbt
+        - daily
+        - ecommerce_daily_full
+      # Dạng object: ghim luôn timezone cho lịch chạy
+      schedule:
+        cron: "0 2 * * *" # 02:00 giờ Việt Nam
+        timezone: Asia/Ho_Chi_Minh
+      catchup: false
+      start_date: "2026-01-01"
+      # Chạy chồng nhau sẽ vừa load CSV vừa build từ chính dữ liệu đang load
+      max_active_runs: 1
+      dagrun_timeout: 7200 # giây
+      default_args:
+        owner: "corpGroup:Data-Platform"
+        retries: 1
+        retry_delay: 300 # giây

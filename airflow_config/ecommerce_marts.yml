@@ -1,0 +1,60 @@
+# =====================================================================
+# Hai DAG trong cùng một file — mỗi khoá mức cao nhất là một dag_id.
+#
+# Cố ý dùng hai dạng `schedule` khác nhau để chứng minh factory xử lý được cả
+# hai: chuỗi cron trần và object {cron, timezone}.
+# =====================================================================
+
+# Làm tươi bảng giao dịch mỗi giờ.
+#
+# Chỉ chọn marts, KHÔNG kéo theo upstream (không dùng dấu '+'). Staging là view
+# nên luôn tươi; riêng int_order_items_enriched là table, có thể cũ tới lần chạy
+# daily gần nhất. Chấp nhận đánh đổi này để mỗi giờ không phải dựng lại bảng
+# intermediate. Khi nào cần chặt chẽ hơn thì mô hình hoá bằng Airflow Assets.
+ecommerce_marts_hourly:
+  is_disabled: false
+  config:
+    select:
+      - path:models/marts/fct_orders.sql
+      - path:models/marts/fct_order_items.sql
+      - path:models/marts/agg_daily_revenue.sql
+    dbt:
+      target: prod
+      command: build
+    dag_params:
+      tags:
+        - ecommerce
+        - dbt
+        - hourly
+        - ecommerce_marts_hourly
+      schedule: "15 * * * *" # dạng chuỗi cron trần
+      catchup: false
+      max_active_runs: 1
+      default_args:
+        owner: "corpGroup:Data-Platform"
+        retries: 1
+        retry_delay: 300
+
+# Dimension đổi chậm nên tách riêng chạy đêm. Đang tắt vì DAG daily ở trên đã
+# bao trọn path:models/marts — bật cái này lên chỉ khi tách daily ra hẹp hơn.
+ecommerce_dims_nightly:
+  is_disabled: true
+  config:
+    select:
+      - path:models/marts/dim_customers.sql
+      - path:models/marts/dim_products.sql
+    dbt:
+      target: prod
+      command: build
+    dag_params:
+      tags:
+        - ecommerce
+        - dbt
+        - nightly
+        - ecommerce_dims_nightly
+      schedule:
+        cron: "30 1 * * *"
+        timezone: Asia/Ho_Chi_Minh
+      catchup: false
+      default_args:
+        owner: "corpGroup:Data-Platform"

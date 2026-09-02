@@ -20,7 +20,8 @@ gcp_project/
 ├── profiles.yml              # Kết nối dbt -> BigQuery (đọc từ env, an toàn để commit)
 ├── dbt_project.yml           # Cấu hình project dbt
 ├── packages.yml              # Package dbt phụ thuộc (dbt_utils, dbt_expectations)
-├── requirements.txt          # Thư viện Python
+├── requirements.txt          # Thư viện Python cho dbt
+├── requirements-airflow.txt  # Thư viện Airflow — CỐ Ý cài vào venv KHÁC
 │
 ├── .vscode/                  # Cấu hình VS Code + Tasks chạy 1 click
 │
@@ -29,7 +30,21 @@ gcp_project/
 │   ├── _env.py               # Đọc cấu hình dùng chung
 │   ├── generate_sample_data.py   # Sinh CSV mẫu vào data/raw/
 │   ├── setup_bigquery.py     # Kiểm tra kết nối + tạo dataset
-│   └── load_to_bigquery.py   # Nạp CSV -> BigQuery
+│   ├── load_to_bigquery.py   # Nạp CSV -> BigQuery
+│   ├── airflow_bootstrap.sh  # Dựng Airflow trong WSL2 (chạy lại được)
+│   └── cleanup_pr_datasets.py    # Xoá dataset của PR đã đóng
+│
+├── airflow_config/           # ★ Khai báo DAG bằng YAML — thêm pipeline ở đây
+│   ├── ecommerce_daily_full.yml
+│   └── ecommerce_marts.yml
+│
+├── dags/                     # Bundle DAG mà Airflow đọc
+│   ├── dag_builder.py        # Quét airflow_config/*.yml -> sinh DAG động
+│   └── dbt_dag_factory/      # Loader: validate YAML, dựng task dbt
+│
+├── airflow_bootstrap/        # DAG hạ tầng, chạy ở bundle NGOÀI repo
+│   ├── git_sync_main.py      # Kéo origin/main về mỗi 5 phút
+│   └── git_pr_builds.py      # Build thử PR đang mở vào dataset riêng
 │
 ├── data/raw/                 # CSV nguồn (bị gitignore)
 │
@@ -401,6 +416,168 @@ dbt test --select stg_ecommerce__orders     # test của 1 model
    thay cho tên bảng cứng — đây là cách dbt tự dựng đồ thị phụ thuộc.
 3. Khai báo model + test trong file `_*.yml` cùng thư mục.
 4. Chạy `dbt build --select ten_model_moi`.
+
+---
+
+---
+
+## Bước 6 — Orchestration bằng Airflow (tuỳ chọn)
+
+Đến đây pipeline vẫn chạy tay. Phần này dựng Airflow để nó tự chạy theo lịch,
+tự kéo code mới nhất từ GitHub, và tự build thử mỗi Pull Request.
+
+### 6.1. Vì sao phải qua WSL2
+
+Airflow **không chạy native trên Windows**. Cách nhẹ nhất là WSL2 Ubuntu — không
+cần cài Docker.
+
+Mở **PowerShell với quyền Administrator**:
+
+```powershell
+wsl --install -d Ubuntu-24.04
+# máy sẽ reboot; sau đó Ubuntu tự mở và hỏi username/password UNIX
+wsl --set-default-version 2
+wsl -l -v      # phải thấy: Ubuntu-24.04  Running  2
+```
+
+Bật systemd để Airflow không chết khi đóng terminal — chạy **trong Ubuntu**:
+
+```bash
+sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+[boot]
+systemd=true
+EOF
+```
+
+Quay lại PowerShell: `wsl --shutdown`, rồi mở lại Ubuntu.
+
+### 6.2. Chạy script cài đặt
+
+```bash
+# trong Ubuntu
+git clone https://github.com/tamtran99/gcp_project.git ~/repos/gcp_project
+bash ~/repos/gcp_project/scripts/airflow_bootstrap.sh
+```
+
+Script tạo hai venv **tách biệt** (`~/venvs/airflow` cho Airflow 3.3.1,
+`~/venvs/dbt` cho dbt), khởi tạo metadata DB, tạo pool, và sinh file biến môi
+trường `~/airflow/airflow-env.sh`.
+
+> Hai venv riêng không phải cho gọn: dbt-core 1.12 và airflow-core ghim
+> `jinja2`, `click`, `protobuf` ở những khoảng xung đột trực tiếp. Trộn chung thì
+> một trong hai sẽ hỏng theo kiểu rất khó lần ra.
+
+Mọi thứ nằm trên ext4 của WSL, **không đặt dưới `/mnt/c`**: DrvFs chậm 5–20 lần
+với hàng nghìn file nhỏ mà dbt phải đọc, và `chmod` trên đó vô nghĩa nên file key
+sẽ world-readable với mọi tiến trình Windows.
+
+### 6.3. Service account
+
+Airflow chạy dbt với target `prod`, dùng service account chứ không dùng tài khoản
+cá nhân của bạn:
+
+```bash
+source ~/airflow/airflow-env.sh    # nhớ sửa GCP_PROJECT_ID trong file này trước
+gcloud iam service-accounts create airflow-dbt --display-name="Airflow dbt runner"
+SA="airflow-dbt@$GCP_PROJECT_ID.iam.gserviceaccount.com"
+
+# bigquery.user chứ không phải jobUser: build PR cần quyền TẠO dataset mới
+gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
+  --member="serviceAccount:$SA" --role="roles/bigquery.user"
+gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
+  --member="serviceAccount:$SA" --role="roles/bigquery.dataEditor"
+
+gcloud iam service-accounts keys create ~/secrets/gcp-sa-airflow.json --iam-account="$SA"
+chmod 600 ~/secrets/gcp-sa-airflow.json
+
+dbt debug --target prod    # phải ra "All checks passed!"
+```
+
+### 6.4. Bật UI
+
+```bash
+bash ~/repos/gcp_project/scripts/airflow_bootstrap.sh --start
+```
+
+Mở http://localhost:8080 từ Windows. Mật khẩu admin nằm ở
+`~/airflow/simple_auth_manager_passwords.json.generated`.
+
+### 6.5. Khai báo DAG bằng YAML
+
+Không viết Python. Mỗi file trong `airflow_config/` khai báo một hoặc nhiều DAG:
+
+```yaml
+ecommerce_marts_hourly:
+  is_disabled: false
+  config:
+    select:
+      - path:models/marts/fct_orders.sql
+      - path:models/marts/agg_daily_revenue.sql
+    dbt:
+      target: prod
+      command: build
+    dag_params:
+      tags: [ecommerce, dbt, hourly]
+      schedule: "15 * * * *"
+      catchup: false
+      default_args:
+        owner: "corpGroup:Data-Platform"
+```
+
+`dags/dag_builder.py` quét thư mục, validate rồi sinh DAG. Tài liệu đầy đủ về
+schema: [`airflow_config/README.md`](airflow_config/README.md).
+
+Kiểm tra trước khi push:
+
+```bash
+python "$GCP_REPO_DIR/dags/dag_builder.py"   # liệt kê DAG dựng được
+airflow dags list-import-errors              # phải rỗng
+```
+
+Một file YAML sai cú pháp **không** làm mất các DAG khác — nó sinh ra một DAG
+`_config_error__<tên>` mang tag `config-error` để lỗi hiện rõ trên UI.
+
+### 6.6. Tự lấy code mới nhất từ GitHub
+
+Hai DAG hạ tầng, nguồn thật ở `airflow_bootstrap/`:
+
+| DAG | Lịch | Việc |
+|---|---|---|
+| `git_sync_main` | mỗi 5 phút | `git fetch` + `reset --hard origin/main` → `dbt deps` → `airflow dags reserialize` |
+| `git_pr_builds` | mỗi 15 phút | Hỏi GitHub API các PR đang mở → `dbt build` mỗi PR vào dataset riêng |
+
+Push lên `main` xong, thay đổi lên UI trong vòng ~5 phút. Không cần restart gì.
+
+`git_sync_main` chỉ chạy `dbt deps` khi `origin/main` thật sự đổi — không có chốt
+đó thì nó chạy 288 lần/ngày cho một repo đứng yên.
+
+**PR build không thể đụng vào production.** Nó dùng `--target ci` với
+`BQ_CI_DATASET=pr_<số>`, nên PR #42 ghi vào `pr_42_staging` / `pr_42_marts`.
+Dataset của PR đã đóng được `scripts/cleanup_pr_datasets.py` dọn tự động.
+
+Nếu repo là private, hoặc bạn muốn tránh rate limit của GitHub:
+
+```bash
+airflow variables set github_token '<personal access token>'
+```
+
+### 6.7. Kiểm tra hoạt động
+
+```bash
+source ~/airflow/airflow-env.sh
+airflow dags list --bundle-name gcp-project     # DAG sinh từ YAML
+airflow dags list --bundle-name bootstrap       # 2 DAG git-sync
+airflow dags test ecommerce_marts_hourly --bundle-name gcp-project
+```
+
+Cách chứng minh PR build an toàn: chạy thử một lần với target `ci` rồi so tên
+dataset.
+
+```bash
+BQ_CI_DATASET=pr_smoke dbt build --target ci --select path:models/staging
+bq ls --project_id="$GCP_PROJECT_ID"    # thấy pr_smoke_staging, prod không đổi
+bq rm -r -f -d "$GCP_PROJECT_ID:pr_smoke_staging"
+```
 
 ---
 
