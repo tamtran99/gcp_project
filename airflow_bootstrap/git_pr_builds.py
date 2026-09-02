@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import timedelta
 
@@ -42,6 +44,53 @@ BUILT_SHAS_VAR = "pr_last_built_sha"
 GITHUB_TOKEN_VAR = "github_token"
 
 BASH_PREAMBLE = "set -Eeuo pipefail\n"
+
+# URL gốc của Airflow UI, dùng làm target_url cho status trên GitHub. Người bấm
+# vào link đang ngồi cùng máy nên localhost là đủ; đổi khi Airflow chạy nơi khác.
+AIRFLOW_BASE_URL = os.environ.get("AIRFLOW_BASE_URL", "http://localhost:8080")
+
+# GitHub gom status theo `context`. Đổi chuỗi này = tạo ra một check hoàn toàn
+# mới, còn check cũ nằm lại vĩnh viễn ở trạng thái cuối cùng của nó.
+STATUS_CONTEXT = "airflow/dbt-pr-build"
+
+
+def _github(method: str, path: str, token: str | None, payload=None):
+    """Gọi GitHub API, trả về JSON đã parse (hoặc None khi body rỗng)."""
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "airflow-git-pr-builds",
+    }
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    request = urllib.request.Request(
+        f"https://api.github.com{path}", data=data, headers=headers, method=method
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        body = response.read()
+    return json.loads(body) if body else None
+
+
+def _post_status(token, sha, state, description, target_url=None):
+    """Gắn trạng thái build lên đúng commit của PR.
+
+    Dùng Statuses API chứ không phải Checks API: Checks API chỉ cho GitHub App
+    ghi, còn personal access token thì không dùng được.
+    """
+    payload = {
+        "state": state,  # pending | success | failure | error
+        "context": STATUS_CONTEXT,
+        # GitHub cắt description ở 140 ký tự
+        "description": description[:140],
+    }
+    if target_url:
+        payload["target_url"] = target_url
+    return _github("POST", f"/repos/{GITHUB_REPO}/statuses/{sha}", token, payload)
+
 
 BUILD_PR_COMMAND = f"""{BASH_PREAMBLE}
 REPO="{REPO_DIR}"
@@ -149,6 +198,78 @@ with DAG(
 
     pr_envs = list_open_prs()
 
+    @task(task_id="bao_dang_build")
+    def bao_dang_build(prs: list[dict[str, str]]) -> int:
+        """Gắn 'pending' lên commit của từng PR sắp được build.
+
+        Đặt trước khi build để trong lúc dbt chạy (có thể tới 45 phút) thì trang
+        PR đã hiện là đang có việc, thay vì trông như chưa ai đụng tới.
+        """
+        token = Variable.get(GITHUB_TOKEN_VAR, default=None)
+        if not token:
+            print("Chưa đặt Variable 'github_token' — bỏ qua báo trạng thái.")
+            print("Đặt bằng: airflow variables set github_token '<token>'")
+            return 0
+
+        count = 0
+        for pull in prs:
+            try:
+                _post_status(
+                    token,
+                    pull["PR_HEAD_SHA"],
+                    "pending",
+                    f"dbt build vào {pull['BQ_CI_DATASET']}_*",
+                )
+                count += 1
+            except urllib.error.HTTPError as exc:
+                # Không đẩy được status thì vẫn phải build. Thiếu status là bất
+                # tiện; chặn cả pipeline vì nó mới là hỏng.
+                print(f"PR #{pull['PR_NUMBER']}: không đặt được pending ({exc.code})")
+        print(f"Đã đặt pending cho {count}/{len(prs)} PR")
+        return count
+
+    @task(task_id="bao_ket_qua", trigger_rule="all_done")
+    def bao_ket_qua(prs: list[dict[str, str]], **context) -> dict[str, str]:
+        """Đẩy kết quả cuối lên GitHub, kèm link tới log Airflow.
+
+        PR nào không đẩy được dòng `BUILT` vào XCom thì coi là hỏng — task map
+        của nó fail nên không push gì cả.
+        """
+        token = Variable.get(GITHUB_TOKEN_VAR, default=None)
+        if not token:
+            print("Chưa đặt Variable 'github_token' — bỏ qua báo trạng thái.")
+            return {}
+
+        results = context["ti"].xcom_pull(task_ids="build_pr") or []
+        if isinstance(results, str):
+            results = [results]
+        thanh_cong = {
+            line.split()[1]
+            for line in results
+            if line and line.startswith("BUILT ")
+        }
+
+        run_id = urllib.parse.quote(context["dag_run"].run_id, safe="")
+        log_url = f"{AIRFLOW_BASE_URL}/dags/git_pr_builds/runs/{run_id}"
+
+        ket_qua: dict[str, str] = {}
+        for pull in prs:
+            so = pull["PR_NUMBER"]
+            ok = so in thanh_cong
+            state = "success" if ok else "failure"
+            mo_ta = (
+                f"dbt build xong → {pull['BQ_CI_DATASET']}_marts"
+                if ok
+                else "dbt build hỏng — mở log Airflow để xem"
+            )
+            try:
+                _post_status(token, pull["PR_HEAD_SHA"], state, mo_ta, log_url)
+                ket_qua[so] = state
+                print(f"PR #{so}: {state}")
+            except urllib.error.HTTPError as exc:
+                print(f"PR #{so}: không đẩy được status ({exc.code})")
+        return ket_qua
+
     build_pr = BashOperator.partial(
         task_id="build_pr",
         bash_command=BUILD_PR_COMMAND,
@@ -212,5 +333,7 @@ with DAG(
     # hỏng sẽ hiện thành run màu xanh. Task rỗng này giữ lại tín hiệu đó.
     ket_thuc = EmptyOperator(task_id="ket_thuc", trigger_rule="all_success")
 
+    chain(bao_dang_build(pr_envs), build_pr)
     chain(build_pr, record_built_shas(), cleanup, ket_thuc)
+    chain(build_pr, bao_ket_qua(pr_envs))
     chain(build_pr, ket_thuc)
