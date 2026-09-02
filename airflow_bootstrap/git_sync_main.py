@@ -86,7 +86,15 @@ with DAG(
             '  echo "NOCHANGE $LOCAL"\n'
             "  exit 0\n"
             "fi\n"
-            'git reset --hard "$REMOTE"\n'
+            # Checkout DETACHED chứ không `git reset --hard origin/main`.
+            #
+            # `reset --hard` dịch nhánh đang được checkout. Nếu ai đó để clone ở
+            # nhánh khác (bootstrap có GIT_REF để test PR trước khi merge) thì
+            # reset sẽ dời luôn nhánh đó về main — mất code mà không có dấu vết
+            # rõ ràng. Detached HEAD không có nhánh nào để hỏng, và nói đúng bản
+            # chất: clone này là bản triển khai của origin/main, không phải chỗ
+            # làm việc.
+            'git checkout --quiet --force --detach "$REMOTE"\n'
             # CẢNH BÁO: KHÔNG BAO GIỜ thêm -x vào lệnh dưới đây.
             # `git clean -fdx` sẽ xoá sạch dbt_packages/, target/, logs/ và
             # data/raw/*.csv — tất cả đều nằm trong .gitignore. Không có -x thì
