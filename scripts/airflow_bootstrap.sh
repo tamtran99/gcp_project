@@ -189,6 +189,14 @@ export AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL=60
 # "dags-folder". Bundle bootstrap nằm ngoài repo nên git reset không đụng tới.
 export AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST='[{"name":"bootstrap","classpath":"airflow.dag_processing.bundles.local.LocalDagBundle","kwargs":{"path":"$BOOTSTRAP_DAGS","refresh_interval":300}},{"name":"gcp-project","classpath":"airflow.dag_processing.bundles.local.LocalDagBundle","kwargs":{"path":"$REPO_DIR/dags","refresh_interval":30}}]'
 
+# BẮT BUỘC: \`airflow standalone\` sinh api-server / scheduler / dag-processor /
+# triggerer bằng cách gọi lệnh \`airflow\` TRẦN chứ không phải đường dẫn tuyệt
+# đối. Thiếu venv bin trên PATH thì cả bốn thread chết ngay với
+# "FileNotFoundError: [Errno 2] No such file or directory: 'airflow'", còn tiến
+# trình cha vẫn sống nên nhìn như đang chạy mà không có gì listen cổng 8080.
+# Nối vào CUỐI PATH để không che python3 của hệ thống.
+export PATH="\$PATH:$AIRFLOW_VENV/bin"
+
 # ---- Đường dẫn dùng chung cho DAG factory ----
 export GCP_REPO_DIR="$REPO_DIR"
 export GIT_REMOTE_URL="$REMOTE_URL"
