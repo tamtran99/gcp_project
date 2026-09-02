@@ -1,0 +1,6 @@
+# dag-processor mặc định coi MỌI file .py trong bundle là file DAG.
+# Các module dưới đây chỉ là thư viện của factory, không tự khai báo DAG —
+# để lọt vào thì mỗi vòng parse lại tốn công import vô ích và sinh cảnh báo.
+#
+# Cú pháp mặc định của .airflowignore là REGEX (không phải glob).
+dbt_dag_factory/
