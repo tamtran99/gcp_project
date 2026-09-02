@@ -32,6 +32,7 @@ fi
 
 REPO_DIR="${GCP_REPO_DIR:-$HOME/repos/gcp_project}"
 REMOTE_URL="${GIT_REMOTE_URL:-https://github.com/tamtran99/gcp_project.git}"
+GIT_REF="${GIT_REF:-main}"          # nhanh muon dung; doi khi can test PR truoc khi merge
 AIRFLOW_HOME_DIR="${AIRFLOW_HOME:-$HOME/airflow}"
 AIRFLOW_VENV="$HOME/venvs/airflow"
 DBT_VENV="$HOME/venvs/dbt"
@@ -78,17 +79,31 @@ esac
 # --- 1. Kiểm tra Python ----------------------------------------------------
 
 log "Kiểm tra Python và gói hệ thống"
-if [[ -z "$PY_BIN" ]] || ! "$PY_BIN" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3,10) else 1)'; then
-  warn "Chưa có Python >= 3.10. Đang cài python3 của distro..."
-  sudo apt-get update
-  sudo apt-get install -y python3 python3-venv python3-dev
-  PY_BIN="$(command -v python3)"
+
+# Chỉ gọi sudo khi THẬT SỰ thiếu gói. Nhờ vậy script chạy trót lọt với user
+# thường trên máy đã cài sẵn (ví dụ WSL vừa được dựng bằng quyền root), không
+# bị treo ở prompt mật khẩu sudo khi chạy không tương tác.
+need_apt=0
+for c in git curl cc; do
+  command -v "$c" >/dev/null 2>&1 || need_apt=1
+done
+if [[ -z "$PY_BIN" ]] || ! "$PY_BIN" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3,10) else 1)' 2>/dev/null; then
+  need_apt=1
+elif ! "$PY_BIN" -m venv --help >/dev/null 2>&1; then
+  # python3-venv là gói riêng trên Debian/Ubuntu; thiếu nó thì `python -m venv`
+  # fail với thông báo rất khó hiểu.
+  need_apt=1
 fi
 
-# Thiếu python3-venv thì `python -m venv` fail với thông báo rất khó hiểu
-sudo apt-get update -qq
-sudo apt-get install -y git curl build-essential libssl-dev libffi-dev pkg-config
-sudo apt-get install -y python3-venv python3-dev
+if (( need_apt )); then
+  warn "Thiếu gói hệ thống, cần quyền sudo để cài"
+  sudo apt-get update
+  sudo apt-get install -y git curl build-essential libssl-dev libffi-dev pkg-config
+  sudo apt-get install -y python3 python3-venv python3-dev
+  PY_BIN="${PY_BIN:-$(command -v python3)}"
+else
+  echo "    gói hệ thống đã đủ, không cần sudo"
+fi
 
 PYTHON_VERSION="$("$PY_BIN" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
 CONSTRAINTS="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
@@ -103,13 +118,24 @@ fi
 
 # --- 2. Clone repo ---------------------------------------------------------
 
-log "Chuẩn bị clone tại $REPO_DIR"
+log "Chuẩn bị clone tại $REPO_DIR (ref: $GIT_REF)"
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   mkdir -p "$(dirname "$REPO_DIR")"
-  git clone "$REMOTE_URL" "$REPO_DIR"
+  git clone --branch "$GIT_REF" "$REMOTE_URL" "$REPO_DIR"
 else
-  echo "    đã có, bỏ qua"
+  echo "    clone đã có, giữ nguyên nhánh $(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
 fi
+
+# Clone nhầm nhánh chưa có phần Airflow là lỗi rất dễ mắc mà lại khó hiểu:
+# bootstrap chạy xong sạch sẽ nhưng UI Airflow trống trơn, không DAG nào cả.
+for must in dags/dag_builder.py airflow_config airflow_bootstrap; do
+  if [[ ! -e "$REPO_DIR/$must" ]]; then
+    warn "Không thấy $must trong $REPO_DIR (đang ở nhánh $(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD))."
+    warn "Nhánh này chưa có phần Airflow. Đặt GIT_REF=<nhánh> rồi chạy lại."
+    exit 1
+  fi
+done
+echo "    OK: dags/, airflow_config/, airflow_bootstrap/ đều có mặt"
 
 # --- 3. Hai venv TÁCH BIỆT -------------------------------------------------
 
