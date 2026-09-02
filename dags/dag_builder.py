@@ -46,7 +46,14 @@ for _spec, _error in load_specs():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    _dags = {k: v for k, v in dict(globals()).items() if hasattr(v, "dag_id")}
+    from airflow.sdk import DAG
+
+    # Lọc bằng isinstance chứ KHÔNG bằng hasattr("dag_id"): DagSpec cũng có
+    # thuộc tính dag_id, để lọt vào thì vừa đếm sai vừa nổ ở _obj.tasks.
+    _dags = {k: v for k, v in dict(globals()).items() if isinstance(v, DAG)}
     print(f"\nĐã dựng {len(_dags)} DAG:")
     for _name, _obj in sorted(_dags.items()):
-        print(f"  - {_obj.dag_id:<32} tasks={len(_obj.tasks)} schedule={_obj.timetable.summary}")
+        print(
+            f"  - {_obj.dag_id:<28} tasks={len(_obj.tasks):<3} "
+            f"schedule={_obj.timetable.summary}"
+        )
