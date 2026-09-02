@@ -176,9 +176,18 @@ macro thêm tiền tố `BQ_CI_DATASET` → PR #42 ghi vào `pr_42_marts`.
   Bắt buộc: sửa `airflow_config/*.yml` không làm đổi mtime của `dag_builder.py`.
 - **`DBT_PROFILES_DIR` phải tuyệt đối** trong `~/airflow/airflow-env.sh`. `.env` của
   repo đặt `=.` mà BashOperator chạy ở thư mục tạm → "Could not find profile".
-- **`GCP_SA_KEYFILE` và `GOOGLE_APPLICATION_CREDENTIALS` phải trỏ cùng file.** dbt
-  đọc cái đầu, `scripts/*.py` (dùng `bigquery.Client()`) đọc cái sau. Lệch nhau ra
-  lỗi rất khó hiểu: dbt chạy ngon còn script nạp CSV thì `DefaultCredentialsError`.
+- **Không dùng service account key — project bật `iam.disableServiceAccountKeyCreation`.**
+  Tải key về sẽ lỗi `FAILED_PRECONDITION`. Target `prod`/`ci` dùng `method: oauth`
+  cộng `impersonate_service_account` (`GCP_IMPERSONATE_SA`): xác thực bằng ADC rồi
+  mượn danh tính SA. Cần `roles/iam.serviceAccountTokenCreator` trên chính SA đó và
+  API `iamcredentials.googleapis.com` đã bật. Grant IAM mất ~40 giây mới có hiệu lực —
+  `PERMISSION_DENIED` ngay sau khi cấp quyền thường chỉ là chưa lan truyền.
+- **`GCP_IMPERSONATE_SA` để trống là hợp lệ, không phải quên.** dbt render TOÀN BỘ
+  `profiles.yml` nên target `dev` cũng phải parse được dòng đó; chuỗi rỗng được dbt
+  chuẩn hoá thành `None` = không mượn danh tính ai.
+- **`scripts/*.py` KHÔNG mượn danh tính SA.** Chúng dùng `bigquery.Client()` nên chạy
+  dưới tài khoản trong `GOOGLE_APPLICATION_CREDENTIALS`, còn dbt thì mượn SA. Hai
+  danh tính khác nhau — quyền lệch nhau sẽ ra lỗi chỉ xuất hiện ở một bên.
 - **`append_env=True`** trên mọi BashOperator. Mặc định `False` thay sạch
   environment, mất `PATH`/`HOME` và mọi `env_var()` trong `profiles.yml` sẽ nổ.
 - **Mỗi task dbt có `--target-path` riêng** (`target/airflow/<dag>/<ts>_<try>`).

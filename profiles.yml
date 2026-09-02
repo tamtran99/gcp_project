@@ -31,12 +31,27 @@ ecommerce_analytics:
       # Chặn query quét quá 20 GB. Bỏ comment khi muốn siết chi phí.
       # maximum_bytes_billed: 21474836480
 
-    # ---------------- PROD: dùng cho CI/CD (service account) ----------
-    # Kích hoạt bằng: dbt run --target prod
+    # ---------------- PROD: dung cho Airflow chay theo lich ----------
+    # Kich hoat bang: dbt run --target prod
+    #
+    # KHONG dung service account key. Project nay bat org policy
+    # constraints/iam.disableServiceAccountKeyCreation nen tai key ve se loi
+    # FAILED_PRECONDITION. Thay vao do dung IMPERSONATION: xac thuc bang ADC
+    # cua nguoi/may dang chay, roi muon danh tinh service account.
+    #
+    # Doi lai la ADC phai ton tai va con han. Neu sau nay policy cho phep key
+    # thi doi lai thanh method: service-account + keyfile: env_var('GCP_SA_KEYFILE').
+    #
+    # Yeu cau: tai khoan trong ADC phai co roles/iam.serviceAccountTokenCreator
+    # TREN chinh service account do, va API iamcredentials.googleapis.com da bat.
+    #
+    # De trong mac dinh la co y: dbt render CA file profiles.yml nen target dev
+    # cung phai parse duoc dong nay khi bien chua duoc set. Chuoi rong = khong
+    # muon danh tinh ai ca.
     prod:
       type: bigquery
-      method: service-account
-      keyfile: "{{ env_var('GCP_SA_KEYFILE', '') }}"
+      method: oauth
+      impersonate_service_account: "{{ env_var('GCP_IMPERSONATE_SA', '') }}"
       project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: "{{ env_var('BQ_PROD_DATASET', 'analytics') }}"
       location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
@@ -58,8 +73,8 @@ ecommerce_analytics:
     # production, 15 phut mot lan.
     ci:
       type: bigquery
-      method: service-account
-      keyfile: "{{ env_var('GCP_SA_KEYFILE', '') }}"
+      method: oauth
+      impersonate_service_account: "{{ env_var('GCP_IMPERSONATE_SA', '') }}"
       project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: "{{ env_var('BQ_CI_DATASET', 'ci_pr') }}"
       location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
