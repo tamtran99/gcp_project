@@ -53,7 +53,20 @@ if __name__ == "__main__":
     _dags = {k: v for k, v in dict(globals()).items() if isinstance(v, DAG)}
     print(f"\nĐã dựng {len(_dags)} DAG:")
     for _name, _obj in sorted(_dags.items()):
+        # CronTriggerTimetable của Airflow 3.3 để cron ở `expression`, KHÔNG có
+        # `summary` hay `description`. Dò lần lượt để không phụ thuộc vào chi
+        # tiết nội bộ của một loại timetable cụ thể.
+        _tt = _obj.timetable
+        _sched = next(
+            (
+                str(v)
+                for v in (getattr(_tt, a, None) for a in ("expression", "summary"))
+                if v
+            ),
+            type(_tt).__name__,
+        )
+        _tz = getattr(_tt, "timezone", "") or ""
         print(
-            f"  - {_obj.dag_id:<28} tasks={len(_obj.tasks):<3} "
-            f"schedule={_obj.timetable.summary}"
+            f"  - {_obj.dag_id:<24} tasks={len(_obj.tasks):<3} "
+            f"schedule={_sched!r} tz={_tz}"
         )
