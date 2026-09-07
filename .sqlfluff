@@ -34,3 +34,16 @@ aliasing = explicit
 
 [sqlfluff:rules:aliasing.column]
 aliasing = explicit
+
+# Repo cố ý căn thẳng cột 'as' cho dễ đọc, nên LT01 mặc định sẽ báo lỗi
+# "Expected only single space before 'as' keyword" ở mọi model.
+#
+# KHÔNG tắt cả LT01 để xử lý việc này: rule đó còn bắt trailing whitespace và
+# thiếu space quanh toán tử. Chỉ gỡ ràng buộc spacing của riêng alias.
+#
+# Vì sao 'any' chứ không phải 'align': repo căn 'as' theo TỪNG NHÓM cột (ngăn
+# bởi dòng trống hoặc comment), mỗi nhóm một mốc riêng. Chế độ 'align' của
+# sqlfluff chỉ căn được theo trọn select_clause = một mốc duy nhất, nên nó báo
+# lỗi chính cái style này. sqlfluff không diễn đạt được alignment theo nhóm.
+[sqlfluff:layout:type:alias_expression]
+spacing_before = any
