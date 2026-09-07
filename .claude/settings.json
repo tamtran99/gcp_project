@@ -1,0 +1,66 @@
+{
+  "env": {
+    "PYTHONUTF8": "1",
+    "DBT_PROFILES_DIR": "."
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dbt compile*)",
+      "Bash(dbt ls*)",
+      "Bash(dbt list*)",
+      "Bash(dbt parse*)",
+      "Bash(dbt debug*)",
+      "Bash(dbt deps*)",
+      "Bash(dbt docs generate*)",
+      "Bash(dbt source freshness*)",
+      "Bash(sqlfluff lint*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(bq ls*)",
+      "Bash(bq show*)"
+    ],
+    "ask": [
+      "Bash(dbt run*)",
+      "Bash(dbt build*)",
+      "Bash(dbt seed*)",
+      "Bash(dbt snapshot*)",
+      "Bash(dbt clean*)",
+      "Bash(bq query*)",
+      "Bash(bq rm*)",
+      "Bash(python scripts/load_to_bigquery.py*)"
+    ],
+    "deny": [
+      "Read(./.env)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/gate_chi_phi.py",
+            "if": "Bash(dbt *)",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/lint_sql.py",
+            "async": true,
+            "timeout": 180,
+            "statusMessage": "sqlfluff lint..."
+          }
+        ]
+      }
+    ]
+  }
+}
